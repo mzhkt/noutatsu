@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ステージ制マリオ風ゲーム</title>
+    <style>
+        body { text-align: center; }  /* 画面の中央に配置する */
+        canvas { background: skyblue; display: block; margin: auto; } /* ゲーム画面の背景色を空色にする */
+    </style>
+</head>
+<body>
+
+    <h1>マリオ風ゲーム（ステージ制）</h1>
+    <p>← → で移動 / スペースキーでジャンプ</p>
+    <canvas id="gameCanvas" width="600" height="300"></canvas>  <!-- ゲームを描画するエリア -->
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        let level = 1;  // 現在のステージ
+        
+        // プレイヤーの情報
+        let player = { 
+            x: 50,  // X座標（左からの位置）
+            y: 200, // Y座標（上からの位置）
+            width: 30, // 幅
+            height: 30, // 高さ
+            speed: 3, // 移動速度
+            velocityX: 0, // X方向の移動速度
+            velocityY: 0, // Y方向の移動速度
+            jumping: false // ジャンプ中かどうか
+        };
+        
+        const gravity = 0.5; // 重力（落下する力）
+        const groundHeight = 20; // 地面の高さ
+        let scrollX = 0; // 画面のスクロール量
+        let nextGenerateX = 800; // 次にステージを生成するX座標
+        let goalX = 1200;  // ゴールの位置
+        
+        let platforms = []; // 足場（ジャンプして乗れる場所）
+        let enemies = [];   // 敵キャラクター
+        let holes = [];     // 落ちる穴
+
+        // ステージを作る関数
+        function generateLevel(startX) {
+            for (let i = 0; i < 5; i++) {
+                let x = startX + i * 200;
+                if (Math.random() < 0.6) platforms.push({ x: x, y: 200 - Math.random() * 50, width: 80, height: 10 });
+                if (Math.random() < 0.3) enemies.push({ x: x + 50, y: 230, width: 30, height: 30, speed: 2, direction: 1 });
+                if (Math.random() < 0.2) holes.push({ x: x + 30, width: 50 });
+            }
+        }
+
+        generateLevel(200);
+
+        let keys = {}; // 押されたキーを保存
+        window.addEventListener("keydown", (e) => { keys[e.code] = true; });
+        window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+        // ゲームの更新処理
+        function update() {
+            // 左右の移動
+            if (keys["ArrowLeft"]) player.velocityX = -player.speed;
+            else if (keys["ArrowRight"]) player.velocityX = player.speed;
+            else player.velocityX = 0;
+
+            // ジャンプ
+            if (keys["Space"] && !player.jumping) {
+                player.velocityY = -10;
+                player.jumping = true;
+            }
+
+            // 重力の影響
+            player.velocityY += gravity;
+            player.x += player.velocityX;
+            player.y += player.velocityY;
+
+            // 地面に着地する処理
+            if (player.y > canvas.height - groundHeight - player.height) {
+                player.y = canvas.height - groundHeight - player.height;
+                player.velocityY = 0;
+                player.jumping = false;
+            }
+
+            // 足場との衝突処理
+            platforms.forEach(platform => {
+                if (player.y + player.height > platform.y &&
+                    player.y + player.height - player.velocityY <= platform.y &&
+                    player.x + player.width > platform.x &&
+                    player.x < platform.x + platform.width) {
+                    player.y = platform.y - player.height;
+                    player.velocityY = 0;
+                    player.jumping = false;
+                }
+            });
+
+            // 敵との衝突判定
+            enemies.forEach(enemy => {
+                enemy.x += enemy.speed * enemy.direction;
+                if (enemy.x < scrollX || enemy.x > scrollX + canvas.width - enemy.width) enemy.direction *= -1;
+                if (player.x < enemy.x + enemy.width &&
+                    player.x + player.width > enemy.x &&
+                    player.y < enemy.y + enemy.height &&
+                    player.y + player.height > enemy.y) {
+                    alert("ゲームオーバー！敵にやられた！");
+                    resetGame();
+                }
+            });
+
+            // 穴に落ちたときの処理
+            holes.forEach(hole => {
+                if (player.x > hole.x && player.x < hole.x + hole.width &&
+                    player.y + player.height >= canvas.height - groundHeight) {
+                    alert("ゲームオーバー！穴に落ちた！");
+                    resetGame();
+                }
+            });
+
+            // ゴール判定
+            if (player.x > goalX) {
+                alert(`ステージ ${level} クリア！次のステージへ`);
+                nextStage();
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        // 画面を描画する処理
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "skyblue";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "green";
+            ctx.fillRect(-scrollX, canvas.height - groundHeight, canvas.width + scrollX, groundHeight);
+            ctx.fillStyle = "red";
+            ctx.fillRect(player.x - scrollX, player.y, player.width, player.height);
+        }
+
+        // ゲームのリセット
+        function resetGame() {
+            player.x = 50;
+            player.y = 200;
+            scrollX = 0;
+            generateLevel(200);
+        }
+
+        // ステージを進める処理
+        function nextStage() {
+            level++;
+            player.x = 50;
+            player.y = 200;
+            scrollX = 0;
+            goalX += 800; 
+            generateLevel(200);
+        }
+
+        update(); // ゲーム開始
+    </script>
+
+</body>
+</html>
